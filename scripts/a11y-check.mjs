@@ -109,6 +109,36 @@ function fakeFolder() {
   };
 }
 
+/**
+ * T114: lets the check hold the scan still. While window.__holdMessages is true, 'message' events
+ * from workers and message ports (Comlink's replies and progress calls) wait in a queue on the page;
+ * window.__releaseMessages() turns the hold off and hands them on in the order they came. The page
+ * itself is not changed: it simply hears nothing from the scan for a while, like a slow disk.
+ * Without this, axe on the scanning screen could run while the page was switching to the results
+ * screen (fading in from opacity 0) and report that fade as a contrast failure on "scanning".
+ */
+function holdableMessages() {
+  window.__holdMessages = false;
+  const queue = [];
+  window.__releaseMessages = () => {
+    window.__holdMessages = false;
+    while (queue.length) { const [listener, target, ev] = queue.shift(); listener.call(target, ev); }
+  };
+  const wrapped = new WeakMap();
+  for (const proto of [Worker.prototype, MessagePort.prototype]) {
+    const add = proto.addEventListener;
+    const remove = proto.removeEventListener;
+    proto.addEventListener = function (type, listener, opts) {
+      if (type !== 'message' || typeof listener !== 'function') return add.call(this, type, listener, opts);
+      if (!wrapped.has(listener)) wrapped.set(listener, function (ev) { if (window.__holdMessages) queue.push([listener, this, ev]); else listener.call(this, ev); });
+      return add.call(this, type, wrapped.get(listener), opts);
+    };
+    proto.removeEventListener = function (type, listener, opts) {
+      return remove.call(this, type, (type === 'message' && wrapped.get(listener)) || listener, opts);
+    };
+  }
+}
+
 /** What has focus, and whether it shows a focus ring and can be seen. */
 function focusInfo() {
   const el = document.activeElement;
@@ -306,6 +336,7 @@ async function newPage(browser, run, ctx) {
   await page.addInitScript(() => {
     for (const k of ['showDirectoryPicker', 'showOpenFilePicker', 'showSaveFilePicker']) { delete window[k]; delete Window.prototype[k]; }
   });
+  await page.addInitScript(holdableMessages);
   await page.goto(base);
   await page.waitForLoadState('networkidle');
   return page;
@@ -329,14 +360,22 @@ async function desktop(browser) {
   check(liveBefore > 0, 'serious', run, 'start: empty folder note',
     `"This folder is empty" is announced (4.1.3): the status region ${liveBefore ? 'existed' : 'did not exist'} before the note was put in it`);
 
-  // Scanning, then Stop.
+  // Scanning, then Stop. T114: the scan is held still (holdableMessages) from before it starts until
+  // Stop has been pressed, so the scanning screen can't turn into the results screen while axe runs
+  // on it, and Stop always lands while the scan is still going (the scan worker waits for its next
+  // batch of files, whose hand-over waits on a held reply, so it can't finish meanwhile).
+  await page.evaluate(() => { window.__holdMessages = true; });
   await scanFolder(page, fixture);
   const scanning = await h1(page, /Checking your files|Looking for exact copies/).waitFor({ timeout: 10_000 }).then(() => true, () => false);
   if (scanning) {
     await focusOnHeading(page, run, 'scanning');
     const said = new Set();
     for (let i = 0; i < 6; i++) { said.add(await statusText(page).catch(() => '')); await page.waitForTimeout(150); }
+    const scanH1 = () => page.locator('main h1').innerText().catch(() => '');
+    const before = await scanH1();
     await axe(page, run, 'scanning').catch(() => add('info', run, 'scanning', 'scan ended before axe finished'));
+    const after = await scanH1();
+    check(before === after && /Checking|Looking/.test(after), 'serious', run, 'scanning', `scanning screen stayed put while axe ran (check harness, T114): "${before}" → "${after}"`);
     check([...said].some((x) => /\d+%/.test(x)), 'serious', run, 'scanning', `scan progress in a live region (4.1.3): heard ${[...said].join(' / ')}`);
     const stop = page.getByRole('button', { name: 'Stop scanning' });
     if (await stop.isVisible().catch(() => false)) {
@@ -345,6 +384,7 @@ async function desktop(browser) {
       await page.waitForTimeout(50);
       const f = await page.evaluate(() => document.activeElement?.tagName);
       if (await h1(page, /Checking|Looking/).isVisible().catch(() => false)) check(f !== 'BODY', 'minor', run, 'scanning', `focus kept after pressing Stop (2.4.3), went to ${f}`);
+      await page.evaluate(() => window.__releaseMessages());
       const stopped = await page.getByText(/Scan stopped/).waitFor({ timeout: 30_000 }).then(() => true, () => false);
       if (stopped) {
         await focusOnHeading(page, run, 'start: scan stopped');
@@ -352,6 +392,7 @@ async function desktop(browser) {
       } else add('info', run, 'scanning', 'scan finished before Stop took effect');
     }
   } else add('info', run, 'scanning', 'scan finished before the scanning screen could be checked');
+  await page.evaluate(() => window.__releaseMessages()); // in case Stop wasn't pressed
 
   // A folder with nothing worth keeping.
   if (!(await page.getByRole('button', { name: 'Sort my recovered files' }).isVisible().catch(() => false))) await page.goto(base);
