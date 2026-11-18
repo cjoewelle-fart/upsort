@@ -584,12 +584,33 @@ async function keyboard(browser) {
   check(sel2 < total, 'serious', run, 'review', 'Space unticks a day');
   await page.keyboard.press('Space');
   // Month jump with Enter puts focus on the month heading.
-  const pill = page.locator('.tl-months-pills .chip').nth(1);
-  if (await pill.count()) {
-    await pill.focus();
-    await page.keyboard.press('Enter');
-    const f = await page.evaluate(() => document.activeElement?.tagName);
-    check(f === 'H2', 'minor', run, 'review', `month jump moves focus to that month (${f})`);
+  // The month buttons only show the months of the year at the top of the window, so where the page
+  // happens to be scrolled decides whether they exist (a one-month year or "No date" has none). Go to
+  // a fixed place first: scroll the first month of the earliest year with two or more months to the
+  // top (the months come from the "Jump to a month" picker, which is in the page but hidden when wide),
+  // then use the button for that year's second month. Always runs, always counts.
+  {
+    const keys = await page.locator('.tl-month-select select option').evaluateAll((os) => os.map((o) => o.value));
+    const byYear = new Map();
+    for (const k of keys) if (/^\d{4}-/.test(k)) byYear.set(k.slice(0, 4), [...(byYear.get(k.slice(0, 4)) ?? []), k]);
+    const months = [...byYear.values()].find((ks) => ks.length > 1) ?? [];
+    let f = { tag: 'none', id: '' };
+    let why = months.length ? '' : `no year with two months in the picker (${keys.length} months)`;
+    if (months.length) {
+      await page.evaluate((k) => document.getElementById(`m-${k}`)?.scrollIntoView({ block: 'start' }), months[0]);
+      const pill = page.locator('.tl-months-pills .chip').nth(1);
+      // Wait for the scroll spy: that year's buttons are drawn and its first month is the current one.
+      await page.waitForFunction(() => {
+        const p = document.querySelectorAll('.tl-months-pills .chip');
+        return p.length > 1 && p[0].getAttribute('aria-current') === 'true';
+      }, null, { timeout: 5000 }).catch(() => {});
+      if (await pill.count()) {
+        await pill.focus();
+        await page.keyboard.press('Enter');
+        f = await page.evaluate(() => ({ tag: document.activeElement?.tagName, id: document.activeElement?.id }));
+      } else why = `no month buttons for ${months[0].slice(0, 4)} after jumping there`;
+    }
+    check(f.tag === 'H2' && f.id === `m-${months[1]}`, 'minor', run, 'review', `month jump moves focus to that month (${months[1] ?? '?'}: ${f.tag}#${f.id}${why ? `; ${why}` : ''})`);
   }
   // Disabled Save stays put.
   await page.getByRole('button', { name: 'Unselect all', exact: true }).focus();
