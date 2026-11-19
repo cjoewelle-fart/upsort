@@ -17,6 +17,7 @@
     "fixture": "python3 scripts/make_fixture.py fixtures/recovery",
     "e2e": "node scripts/e2e.mjs",
     "notices": "node scripts/make_notices.mjs",
+    "sample-pack": "node scripts/make-sample-pack.mjs",
     "offline-check": "node scripts/offline-check.mjs",
     "live-check": "node scripts/live-check.mjs",
     "serve-dist": "node scripts/serve-dist.mjs",

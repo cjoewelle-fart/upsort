@@ -529,6 +529,8 @@ export const copy = {
     uploadNote: 'Your browser may ask “Upload files to this site?” That’s the browser’s own wording. Your files are only read on this computer, not sent anywhere.',
     samples: 'Try with example files',
     samplesNote: 'No recovery folder handy? The example files come from a test memory card that was wiped and then recovered.',
+    /** D53: shown on the start screen when the example files can't be fetched (offline: they're not cached). Same wording as the video's offline line. */
+    samplesOffline: 'The example files need an internet connection. Everything else here works offline.',
   },
 
   scanning: {

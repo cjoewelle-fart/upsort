@@ -1,5 +1,6 @@
-// Example files for previews and demos (enabled with VITE_SAMPLES=1).
-// The pack is a real PhotoRec output from a wiped test SD card, published next to the page.
+// Example files for previews and demos (enabled with VITE_SAMPLES=1; always on in the launch build, D53).
+// The pack is a real PhotoRec output from a wiped test SD card, published next to the page (same
+// origin; vite.launch.ts SAMPLE_PACK). It isn't in the offline cache, so offline the fetch fails.
 // Format: 4-byte big-endian index length, JSON index [{ path, size }], then file bytes in order.
 
 export const SAMPLES_ENABLED = import.meta.env.VITE_SAMPLES === '1';

@@ -18,6 +18,10 @@ describe('offline cache guard', () => {
     expect(precacheProblems(sw(['index.html', 'launch/share.png']))).toEqual(['launch/share.png is in the offline cache']);
     expect(precacheProblems(sw(['index.html', 'assets/clip.mp4', 'a.webm', 'captions.en.vtt'])).length).toBe(3);
   });
+  it('fails on the example-files pack (D53: fetched on demand, never cached offline)', () => {
+    expect(precacheProblems(sw(['index.html', 'sample-pack.wasm']))).toEqual(['sample-pack.wasm is in the offline cache']);
+    expect(precacheProblems(sw(['index.html', 'assets/heic.worker-AAA.js', 'assets/libheif-BBB.wasm']))).toEqual([]); // the decoder stays cached
+  });
   it('fails when no precache list is found (so a format change can\'t silently pass)', () => {
     expect(precacheProblems('self.addEventListener("fetch",()=>{})')).toEqual(['no precache list found in sw.js']);
   });
@@ -26,7 +30,7 @@ describe('offline cache guard', () => {
   });
   it('is wired into the build config with launch/ ignored', () => {
     const config = readFileSync(join(__dirname, '..', 'vite.config.ts'), 'utf8');
-    expect(config).toContain("globIgnores: ['launch/**']");
+    expect(config).toContain("globIgnores: ['launch/**', 'sample-pack.wasm']");
     expect(config.match(/deployFiles\(\), precacheGuard\(\)\]/g)?.length).toBe(2); // production and test build
   });
 });

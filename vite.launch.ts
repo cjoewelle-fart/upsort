@@ -51,8 +51,50 @@ export const brandHead = (title?: string): Plugin => ({
   },
 })
 
-/** Files the offline cache must never hold: anything under launch/, and any video or captions file. */
-export const NOT_PRECACHED = /(^|\/)launch\/|\.(mp4|webm|vtt)(\?|$)/i
+/**
+ * The example files (D53): one pack, fetched by src/sample.ts as `./sample-pack.wasm` (same origin).
+ * The .wasm name is only there because the claude.ai preview host serves that binary type.
+ */
+export const SAMPLE_PACK = 'sample-pack.wasm'
+/** Where the launch build reads the pack from (gitignored; `npm run sample-pack -- <photorec-dir>` makes it). */
+export const SAMPLE_PACK_SOURCE = `samples/${SAMPLE_PACK}`
+
+/**
+ * Files the offline cache must never hold: anything under launch/, any video or captions file, and
+ * the example-files pack (~14 MB, fetched only when someone presses "Try with example files").
+ */
+export const NOT_PRECACHED = /(^|\/)launch\/|\.(mp4|webm|vtt)(\?|$)|(^|\/)sample-pack\.wasm(\?|$)/i
+
+/** What's wrong with a sample pack's bytes (empty = fine): 4-byte index length, JSON index, file bytes. */
+export function samplePackProblems(buf: Uint8Array): string[] {
+  if (buf.length < 4) return ['too short']
+  const len = new DataView(buf.buffer, buf.byteOffset, buf.byteLength).getUint32(0)
+  if (4 + len > buf.length) return [`index length ${len} runs past the end`]
+  let index: unknown
+  try { index = JSON.parse(new TextDecoder().decode(buf.subarray(4, 4 + len))) } catch { return ['index is not JSON'] }
+  if (!Array.isArray(index) || !index.length) return ['index is empty']
+  const bad = index.filter((e) => typeof e?.path !== 'string' || !e.path || !Number.isInteger(e?.size) || e.size < 0)
+  if (bad.length) return [`${bad.length} index entries lack a path or size`]
+  const total = 4 + len + index.reduce((n: number, e: { size: number }) => n + e.size, 0)
+  return total === buf.length ? [] : [`index adds up to ${total} bytes, the pack has ${buf.length}`]
+}
+
+/**
+ * Launch build only (D53): ships the example-files pack as a plain same-origin file next to the page.
+ * Fails if the pack is missing or malformed, so the button never ships without its files. It is
+ * left out of the offline cache (globIgnores, and precacheGuard checks it).
+ */
+export const samplePack = (source: string = process.env.SAMPLE_PACK || SAMPLE_PACK_SOURCE): Plugin => ({
+  name: 'keepsake-sample-pack',
+  apply: 'build',
+  generateBundle() {
+    if (!existsSync(source)) throw new Error(`sample pack: ${source} not found (make it with \`npm run sample-pack -- <photorec-output-dir>\`, or set SAMPLE_PACK)`)
+    const bytes = readFileSync(source)
+    const problems = samplePackProblems(bytes)
+    if (problems.length) throw new Error(`sample pack ${source}: ${problems.join('; ')}`)
+    this.emitFile({ type: 'asset', fileName: SAMPLE_PACK, source: bytes })
+  },
+})
 
 /** The URLs in a generated sw.js precache list. */
 export function precacheUrls(sw: string): string[] {

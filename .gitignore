@@ -31,6 +31,8 @@ dist-artifact/
 dist-test/
 dist-artifact-test/
 dist-launch/
+# The launch build's example files (D53, ~14 MB): made by `npm run sample-pack`, not kept in git.
+/samples/
 
 # Agents' temporary worktrees
 .claude/worktrees/

@@ -3,8 +3,9 @@
 //
 // Pilot test page (no example files, title "Upsort (test)"), from `vite build --mode artifact-test`:
 //        node scripts/make-artifact.mjs --test <out-dir>    (writes <out-dir>/keepsake-test.html only)
-import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { buildSamplePack } from './lib/sample-pack.mjs';
 
 const test = process.argv[2] === '--test';
 const [samplesDir, outDir] = test ? [undefined, process.argv[3]] : process.argv.slice(2);
@@ -38,28 +39,6 @@ if (test) {
 writeFileSync(join(outDir, 'keepsake.html'), page);
 
 // 2. Pack the example files (kept under 14 MB by dropping some large photos evenly).
-const walk = (d) => readdirSync(d).flatMap((n) => (statSync(join(d, n)).isDirectory() ? walk(join(d, n)) : [join(d, n)])).sort();
-let files = walk(samplesDir).map((p) => ({ path: relative(samplesDir, p).split('\\').join('/'), data: readFileSync(p) }));
-const LIMIT = 14 * 1024 * 1024;
-const total = () => files.reduce((n, f) => n + f.data.length, 0);
-// Drop every other large JPEG until it fits; if that runs out, drop the largest files of any kind.
-let size = total();
-while (size > LIMIT) {
-  let k = 0;
-  const before = files.length;
-  files = files.filter((f) => {
-    const drop = size > LIMIT && f.path.endsWith('.jpg') && f.data.length > 60_000 && ++k % 2 === 0;
-    if (drop) size -= f.data.length;
-    return !drop;
-  });
-  if (files.length === before) {
-    const biggest = files.reduce((a, b) => (b.data.length > a.data.length ? b : a));
-    files = files.filter((f) => f !== biggest);
-    size -= biggest.data.length;
-  }
-}
-const index = Buffer.from(JSON.stringify(files.map((f) => ({ path: f.path, size: f.data.length }))));
-const head = Buffer.alloc(4);
-head.writeUInt32BE(index.length);
-writeFileSync(join(outDir, 'sample-pack.wasm'), Buffer.concat([head, index, ...files.map((f) => f.data)]));
-console.log(`page ${(page.length / 1024).toFixed(0)} KB, sample pack ${files.length} files, ${(total() / 1048576).toFixed(1)} MB`);
+const { pack, count, bytes } = buildSamplePack(samplesDir);
+writeFileSync(join(outDir, 'sample-pack.wasm'), pack);
+console.log(`page ${(page.length / 1024).toFixed(0)} KB, sample pack ${count} files, ${(bytes / 1048576).toFixed(1)} MB`);

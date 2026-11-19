@@ -83,6 +83,8 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   // Counts start-screen notes, so each one gets its own key.
   const noteCount = useRef(0);
+  // T126 (QA minor 1): a second press while the example pack is still downloading is ignored.
+  const samplesLoading = useRef(false);
   const startWithNote = (note: string) => setScreen({ name: 'start', note, noteKey: ++noteCount.current });
 
   useEffect(() => () => workerRef.current?.raw.terminate(), []);
@@ -132,13 +134,22 @@ export default function App() {
   }
 
   async function trySamples() {
+    // The example files are fetched from the site when the button is pressed (D53: not in the
+    // offline cache), so offline, or if the pack can't be read, say so on the start screen. The
+    // folder error screen would be wrong here: no folder was chosen.
+    if (samplesLoading.current) return;
+    samplesLoading.current = true;
+    let picked: { files: File[]; paths: string[] };
     try {
-      const { files: list, paths } = await loadSamples();
-      setRecoveryRoot(undefined);
-      await scan(list, paths);
+      picked = await loadSamples();
     } catch {
-      setScreen({ name: 'error' });
+      startWithNote(copy.start.samplesOffline);
+      return;
+    } finally {
+      samplesLoading.current = false;
     }
+    setRecoveryRoot(undefined);
+    await scan(picked.files, picked.paths);
   }
 
   async function scan(list: File[], paths: string[]) {

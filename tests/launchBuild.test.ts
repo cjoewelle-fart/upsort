@@ -1,10 +1,13 @@
 // Release checklist §5: the launch build switch. `npm run build:launch` (vite build --mode launch)
 // is indexable and needs SITE_URL; every other build stays the no-index beta build.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SHARE_IMAGE, SITE_URL } from '../src/brand';
-import { headTags } from '../vite.launch';
+import type { UserConfig } from 'vite';
+import { copy } from '../src/ui/copy';
+import viteConfig from '../vite.config';
+import { NOT_PRECACHED, SAMPLE_PACK, headTags, samplePack, samplePackProblems } from '../vite.launch';
 import {
   CSP, LAUNCH_NEEDS_SITE_URL, ROBOTS_TXT, ROBOTS_TXT_LAUNCH, deployFiles, headersFile, launchHtmlProblems, launchProblems, workerPaths,
 } from '../vite.deploy';
@@ -65,7 +68,56 @@ describe('build config', () => {
     expect(pkg.scripts['build:launch']).toBe('tsc -b && vite build --mode launch');
     expect(config).toContain("mode === LAUNCH ? { outDir: 'dist-launch' }");
     expect(config.match(/deployFiles\(\{ launch: true \}\)/g)?.length).toBe(1);
-    expect(config).toMatch(/mode === LAUNCH \? \[brandHead\(\), react\(\), csp\(\), offline\(\), installTags\(\), deployFiles\(\{ launch: true \}\), precacheGuard\(\)\]/);
+    expect(config).toMatch(/mode === LAUNCH \? \[brandHead\(\), react\(\), csp\(\), offline\(\), installTags\(\), deployFiles\(\{ launch: true \}\), samplePack\(\), precacheGuard\(\)\]/);
     expect(readFileSync(join(__dirname, '..', '.gitignore'), 'utf8')).toMatch(/^dist-launch\/$/m);
+  });
+});
+
+// D53: the launch build has the "Try with example files" button and ships the pack, same origin.
+describe('example files (D53)', () => {
+  const config = readFileSync(join(__dirname, '..', 'vite.config.ts'), 'utf8');
+  const plugins = (mode: string) => (viteConfig as (env: { mode: string; command: 'build' }) => UserConfig)({ mode, command: 'build' });
+  const samplesDefine = (mode: string) => (plugins(mode).define as Record<string, string> | undefined)?.['import.meta.env.VITE_SAMPLES'];
+  const names = (mode: string) => (plugins(mode).plugins as unknown[]).flat(3).map((p) => (p as { name?: string })?.name);
+
+  it('the launch build always turns the button on; test builds force it off; others follow the environment', () => {
+    expect(samplesDefine('launch')).toBe('"1"');
+    expect(samplesDefine('testbuild')).toBe('"0"');
+    expect(samplesDefine('artifact-test')).toBe('"0"');
+    expect(samplesDefine('production')).toBeUndefined(); // npm run build: unchanged, no .env turns it on
+    expect(samplesDefine('artifact')).toBeUndefined(); // .env.artifact sets VITE_SAMPLES=1
+    expect(existsSync(join(__dirname, '..', '.env'))).toBe(false);
+    expect(existsSync(join(__dirname, '..', '.env.production'))).toBe(false);
+  });
+  it('only the launch build ships the pack', () => {
+    expect(names('launch')).toContain('keepsake-sample-pack');
+    for (const mode of ['production', 'testbuild', 'artifact', 'artifact-test']) expect(names(mode), mode).not.toContain('keepsake-sample-pack');
+  });
+  it('the pack name matches what the page fetches, and stays out of the offline cache', () => {
+    expect(readFileSync(join(__dirname, '..', 'src', 'sample.ts'), 'utf8')).toContain(`fetch('./${SAMPLE_PACK}')`);
+    expect(NOT_PRECACHED.test(SAMPLE_PACK)).toBe(true);
+    expect(config).toContain(`globIgnores: ['launch/**', '${SAMPLE_PACK}']`);
+  });
+  it('checks the pack format before shipping it', () => {
+    const pack = (index: unknown, body: number) => {
+      const json = new TextEncoder().encode(JSON.stringify(index));
+      const out = new Uint8Array(4 + json.length + body);
+      new DataView(out.buffer).setUint32(0, json.length);
+      out.set(json, 4);
+      return out;
+    };
+    expect(samplePackProblems(pack([{ path: 'recup_dir.1/f1.jpg', size: 3 }, { path: 'recup_dir.1/f2.txt', size: 2 }], 5))).toEqual([]);
+    expect(samplePackProblems(pack([{ path: 'a.jpg', size: 3 }], 2))).toEqual([expect.stringContaining('adds up to')]);
+    expect(samplePackProblems(pack([], 0))).toEqual(['index is empty']);
+    expect(samplePackProblems(pack([{ size: 1 }], 1))).toEqual(['1 index entries lack a path or size']);
+    expect(samplePackProblems(new TextEncoder().encode('<!doctype html><html></html>'))).not.toEqual([]); // a host's page fallback
+  });
+  it('the launch build fails without the pack', () => {
+    const plugin = samplePack(join(__dirname, 'no-such-pack.wasm'));
+    expect(() => (plugin.generateBundle as () => void).call({ emitFile: () => '' })).toThrow(/sample pack: .*not found/);
+  });
+  it('offline, the button says why on the start screen (same wording as the video)', () => {
+    expect(copy.start.samplesOffline).toBe('The example files need an internet connection. Everything else here works offline.');
+    expect(readFileSync(join(__dirname, '..', 'src', 'App.tsx'), 'utf8')).toContain('startWithNote(copy.start.samplesOffline)');
   });
 });

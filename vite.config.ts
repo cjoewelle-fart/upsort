@@ -4,7 +4,7 @@ import { configDefaults } from 'vitest/config'
 import type { Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { cspMeta as csp, deployFiles } from './vite.deploy.ts'
-import { brandHead, precacheGuard } from './vite.launch.ts'
+import { brandHead, precacheGuard, samplePack } from './vite.launch.ts'
 import { APP_NAME, APP_SHORT_NAME, DESCRIPTION } from './src/brand.ts'
 
 // `npm run build:test` (vite build --mode testbuild): the production build for usability
@@ -20,6 +20,8 @@ const isArtifact = (mode: string) => mode === 'artifact' || mode === ARTIFACT_TE
 // can't be uploaded to the beta address by mistake). The default build plus deployFiles({ launch }):
 // indexable (no X-Robots-Tag, robots.txt allows), and it fails while SITE_URL is unset (D42).
 // No other mode passes `launch`. Release checklist §5.
+// D53: the launch build also has the "Try with example files" button (VITE_SAMPLES on) and ships the
+// example-files pack as a same-origin file (samplePack()), kept out of the offline cache.
 const LAUNCH = 'launch'
 
 // The app's name, install name and home-screen label come from src/brand.ts (one setting).
@@ -88,8 +90,9 @@ const offline = () =>
     workbox: {
       globPatterns: ['**/*.{html,js,css,woff,woff2,wasm,svg,png,webp}'], // public/ files included; the manifest is added by the plugin,
       // The launch video, its captions and the share image (public/launch/) are never cached
-      // offline; precacheGuard() fails the build if sw.js lists any of them.
-      globIgnores: ['launch/**'],
+      // offline, nor is the example-files pack (launch build, ~14 MB, D53): precacheGuard() fails
+      // the build if sw.js lists any of them.
+      globIgnores: ['launch/**', 'sample-pack.wasm'],
       maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, // the HEIC decoder worker is ~2 MB
       navigateFallback: 'index.html',
       // The open-source notices (THIRD_PARTY_NOTICES.txt, linked from the privacy page) are a plain
@@ -111,10 +114,12 @@ export default defineConfig(({ mode }) => ({
   plugins: mode === 'artifact' ? [brandHead(), react()]
     : mode === ARTIFACT_TEST ? [brandHead(TEST_TITLE), react(), testBuild()]
     : mode === TEST_BUILD ? [brandHead(TEST_TITLE), react(), csp(), offline(), installTags(), testBuild(), deployFiles(), precacheGuard()]
-    : mode === LAUNCH ? [brandHead(), react(), csp(), offline(), installTags(), deployFiles({ launch: true }), precacheGuard()]
+    : mode === LAUNCH ? [brandHead(), react(), csp(), offline(), installTags(), deployFiles({ launch: true }), samplePack(), precacheGuard()]
     : [brandHead(), react(), csp(), offline(), installTags(), deployFiles(), precacheGuard()],
-  // Test builds never show the example-files button, whatever the environment says.
-  define: mode === TEST_BUILD || mode === ARTIFACT_TEST ? { 'import.meta.env.VITE_SAMPLES': JSON.stringify('0') } : {},
+  // Test builds never show the example-files button, whatever the environment says; the launch
+  // build always does (D53). Other builds follow the environment (.env.artifact turns it on).
+  define: mode === TEST_BUILD || mode === ARTIFACT_TEST ? { 'import.meta.env.VITE_SAMPLES': JSON.stringify('0') }
+    : mode === LAUNCH ? { 'import.meta.env.VITE_SAMPLES': JSON.stringify('1') } : {},
   worker: { format: 'es' },
   // Agents' leftover worktrees (.claude/worktrees/…) hold copies of tests/ without node_modules.
   test: { exclude: [...configDefaults.exclude, '.claude/**'] },
