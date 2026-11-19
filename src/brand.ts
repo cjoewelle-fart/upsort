@@ -43,6 +43,12 @@ export const SITE_TITLE = `${APP_NAME}: sort recovered photos by date`
 export const DESCRIPTION = `${APP_NAME} turns the jumble of files a recovery program like PhotoRec gives back into a photo library sorted by date. Free, in your browser, nothing uploaded.`
 export const SHARE_TITLE = `${TAGLINE.replace(/\.$/, '')}: your photos, sorted by date.`
 export const SHARE_DESCRIPTION = 'Sorts recovered files into a photo library by date. Free, in your browser.'
+/**
+ * D51 (Nov 13): the two plain search pages on the public site (launch build only, vite.search.ts),
+ * as folders relative to SITE_URL. Each is served as <folder>index.html and kept out of the
+ * offline cache. Their words are copy.ts `searchPages`.
+ */
+export const SEARCH_PAGES = { guide: 'photorec-guide/', sort: 'sort-photorec-files-by-date/' } as const
 /** The share image (made by scripts/make-share-image.mjs), relative to SITE_URL. */
 export const SHARE_IMAGE = 'launch/share.png'
 export const SHARE_IMAGE_ALT = 'Three printed photos fanned out, the middle one dated March 2009.'

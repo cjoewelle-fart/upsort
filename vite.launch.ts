@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { Plugin, ResolvedConfig } from 'vite'
-import { APP_NAME, DESCRIPTION, SHARE_DESCRIPTION, SHARE_IMAGE, SHARE_IMAGE_ALT, SHARE_TITLE, SITE_TITLE, SITE_URL } from './src/brand.ts'
+import { APP_NAME, DESCRIPTION, SEARCH_PAGES, SHARE_DESCRIPTION, SHARE_IMAGE, SHARE_IMAGE_ALT, SHARE_TITLE, SITE_TITLE, SITE_URL } from './src/brand.ts'
 
 /** The marker in index.html that the head tags replace. */
 export const HEAD_MARKER = '<!-- brand-head -->'
@@ -51,8 +51,14 @@ export const brandHead = (title?: string): Plugin => ({
   },
 })
 
-/** Files the offline cache must never hold: anything under launch/, and any video or captions file. */
-export const NOT_PRECACHED = /(^|\/)launch\/|\.(mp4|webm|vtt)(\?|$)/i
+/**
+ * Files the offline cache must never hold: anything under launch/, the search pages (D51, see
+ * vite.search.ts) and any video or captions file.
+ */
+export const NOT_PRECACHED = new RegExp(
+  `(^|/)(launch|${Object.values(SEARCH_PAGES).map((d) => d.replace(/\/$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})/|\\.(mp4|webm|vtt)(\\?|$)`,
+  'i',
+)
 
 /** The URLs in a generated sw.js precache list. */
 export function precacheUrls(sw: string): string[] {

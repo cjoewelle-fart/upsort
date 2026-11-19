@@ -111,7 +111,7 @@ Note: moving files out of the tree doesn't remove them from **history**. If the 
 Status: ✅ implemented Nov 12 (dev, uncommitted at the time of writing), then 🟡 D42 to switch on (set `SITE_URL`, run `npm run build:launch`).
 
 Evidence (Nov 12):
-- Points 1–5 are done as designed. Point 6 (HSTS) is left out until HTTPS on the domain is confirmed. There is no sitemap.
+- Points 1–5 are done as designed. Point 6 (HSTS) is left out until HTTPS on the domain is confirmed. There is no sitemap. (T123, Nov 19, on a branch until the owner approves the mockup: the launch build adds `sitemap.xml`, a `Sitemap:` line in robots.txt and the two D51 search pages, see `vite.search.ts`.)
 - `npm run build:launch` writes `dist-launch/` (in `.gitignore`). Only `vite build --mode launch` passes `deployFiles({ launch: true })`.
 - With `SITE_URL = ''` (today), the build stops before bundling and leaves no `dist-launch/`. Its message: "launch build needs SITE_URL in src/brand.ts (D42): an https:// address ending in '/', e.g. 'https://example.org/'; it is """.
 - With `SITE_URL` set to `'https://example.org/'` for one build (then set back to `''`):

@@ -26,7 +26,8 @@ describe('offline cache guard', () => {
   });
   it('is wired into the build config with launch/ ignored', () => {
     const config = readFileSync(join(__dirname, '..', 'vite.config.ts'), 'utf8');
-    expect(config).toContain("globIgnores: ['launch/**']");
+    // The search pages (D51) are ignored too, in the launch build only.
+    expect(config).toContain("globIgnores: ['launch/**', ...(search ? SEARCH_DIRS.map((d) => `${d}/**`) : [])]");
     expect(config.match(/deployFiles\(\), precacheGuard\(\)\]/g)?.length).toBe(2); // production and test build
   });
 });

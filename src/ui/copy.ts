@@ -1049,3 +1049,99 @@ export const copy = {
     },
   },
 };
+
+/** Swaps one exact piece of a page's text, and fails loudly if a later edit means it's no longer there. */
+const swap = (md: string, from: string, to: string) => {
+  if (!md.includes(from)) throw new Error(`search pages: "${from}" not found in the guide`);
+  return md.replace(from, to);
+};
+
+/**
+ * D51 (owner, Nov 13): two plain pages on the public site, for people who search for help with
+ * PhotoRec. Made only by the launch build (vite.search.ts, drawn by src/ui/searchPage.ts). Not
+ * live until the owner has seen the mockup.
+ * The guide page is the in-app guide above with three changes: a heading without "get your photos
+ * back" (launch-message.md, "Don't say"), one line for people who already have recup_dir folders,
+ * and "Open" instead of "Go back to the start of" (a reader from a search was never there).
+ * The sort page is the launch message (team/content/launch-message.md) and Part 6 of the guide.
+ * Same small Markdown as copy.info, plus links to the other page and the app: [words](#to-guide),
+ * [words](#to-sort), [words](#to-app).
+ * `title` is the browser tab and search result title; `description` is the search result's text
+ * (160 characters at most).
+ */
+export const searchPages = {
+  guide: {
+    title: `PhotoRec guide: look for lost photos on a memory card · ${APP}`,
+    description: 'A step-by-step PhotoRec guide for Windows and Mac: look for lost photos on a memory card, then sort the recup_dir folders it makes by date.',
+    md: swap(
+      swap(
+        swap(GUIDE, '# Get your photos back from a memory card with PhotoRec', '# PhotoRec guide: look for lost photos on a memory card'),
+        `PhotoRec finds the photos. Then ${APP} puts them in order by date.\n`,
+        `PhotoRec finds the photos. Then ${APP} puts them in order by date.\n\nAlready have folders called \`recup_dir.1\`, \`recup_dir.2\` and so on? Go to [Part 6: What you’ll see](#part-6-what-youll-see).\n`,
+      ),
+      `1. Go back to the start of ${APP}. You can use`,
+      `1. Open ${APP}. You can use`,
+    ),
+    /** The button at the end: opens the app's start screen (same label as copy.info.guide.cta). */
+    cta: 'Sort my recovered files',
+    /** The second link at the end: the other page. */
+    other: 'Sort PhotoRec files by date',
+  },
+  sort: {
+    title: `Sort PhotoRec files by date · ${APP}`,
+    description: `PhotoRec gives back recup_dir folders full of files named like f12345678.jpg. ${APP} sorts the photos by date, in your browser. Free, nothing uploaded.`,
+    md: `# Sort PhotoRec files by date
+
+PhotoRec gives back lots of files with names like \`f12345678.jpg\`, all mixed together. ${APP} finds the photos and videos. It sets aside small preview copies, exact copies, damaged files and app images. Then it sorts the rest by the date each one was taken.
+
+It’s free, runs in your browser, and nothing is uploaded or deleted.
+
+## What PhotoRec gives back
+
+PhotoRec saves what it finds in folders named \`recup_dir.1\`, \`recup_dir.2\`, \`recup_dir.3\` and so on.
+
+Inside them are lots of files with names like \`f12345678.jpg\`. PhotoRec can’t bring back the old names or folders, so everything is mixed together. There will also be small preview copies, copies of the same photo, broken files and files from apps.
+
+You don’t need to sort through them yourself.
+
+## How it works
+
+1. **Choose your recovery folder**
+   Pick the folder your recovery program made. It’s the one that holds \`recup_dir.1\`, \`recup_dir.2\` and so on. ${APP} reads it on your computer and never changes it.
+2. **Sorted by date**
+   ${APP} finds your photos and videos and puts them in order by the date each one was taken. Small preview copies, exact copies, damaged files and app images are set aside, never deleted. You can keep any of them.
+3. **Check and save**
+   Look through, unselect anything you don’t want, and save. ${APP} makes new copies in a folder you choose, with a folder for each year and month. Photos with no date go in a “No date” folder. Your recovery folder stays as it was.
+
+## Questions
+
+### Does it recover my photos?
+
+No. ${APP} doesn’t search your memory card or phone for lost photos. A recovery program like PhotoRec does that part. ${APP}’s job is to sort the files your recovery program has already found. Haven’t used one yet? Our free guide shows you how, step by step.
+[Read the step-by-step PhotoRec guide](#to-guide)
+
+### Will it change or delete my files?
+
+No. ${APP} only reads your recovery folder. Files it sets aside stay exactly where they are, and you can keep any of them. When you save, it makes new copies in a folder you choose. You’ll need some free space for them.
+
+### Are my photos uploaded?
+
+No. ${APP} runs inside your browser, on your computer. Your photos are never sent to us or anyone else. There’s no account to make.
+
+### What do I need?
+
+A computer and the folder your recovery program made. ${APP} is free. It works best in Chrome or Edge. In other browsers, your photos are saved as zip files instead of straight into a folder.
+
+### Which recovery programs does it work with?
+
+${APP} is made and tested for folders from PhotoRec, a free recovery program. You can choose a folder from another recovery program too, but we haven’t tested those yet.
+`,
+    cta: 'Sort my recovered files',
+    other: 'Read the step-by-step PhotoRec guide',
+  },
+  /** Jumps past the logo to the page's text (same as copy.skip). */
+  skip: 'Skip to content',
+  /** The footer under both pages, as on the start screen: the name, the tagline and the code link. */
+  tagline: TAGLINE,
+  sourceCode: 'Source code',
+};

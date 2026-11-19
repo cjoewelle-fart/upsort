@@ -5,6 +5,7 @@ import type { Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { cspMeta as csp, deployFiles } from './vite.deploy.ts'
 import { brandHead, precacheGuard } from './vite.launch.ts'
+import { SEARCH_DIRS, SEARCH_ROUTES, searchPages } from './vite.search.ts'
 import { APP_NAME, APP_SHORT_NAME, DESCRIPTION } from './src/brand.ts'
 
 // `npm run build:test` (vite build --mode testbuild): the production build for usability
@@ -19,7 +20,8 @@ const isArtifact = (mode: string) => mode === 'artifact' || mode === ARTIFACT_TE
 // `npm run build:launch` (vite build --mode launch): the public launch build, in dist-launch/ (so it
 // can't be uploaded to the beta address by mistake). The default build plus deployFiles({ launch }):
 // indexable (no X-Robots-Tag, robots.txt allows), and it fails while SITE_URL is unset (D42).
-// No other mode passes `launch`. Release checklist §5.
+// No other mode passes `launch`. Release checklist §5. Only this build also writes the search pages
+// and sitemap.xml (D51, vite.search.ts).
 const LAUNCH = 'launch'
 
 // The app's name, install name and home-screen label come from src/brand.ts (one setting).
@@ -65,7 +67,9 @@ const installTags = (): Plugin => ({
 // anything except the files listed in its precache manifest (all same-origin), and user
 // files never pass through it (they're read with the File API, not fetched).
 // Updates: skipWaiting + clientsClaim, so a new deploy takes over on the next visit.
-const offline = () =>
+// `search` (launch build only, D51): the search pages (vite.search.ts) are left out of the cache,
+// and the service worker never answers their addresses with the app's page.
+const offline = ({ search = false }: { search?: boolean } = {}) =>
   VitePWA({
     registerType: 'autoUpdate',
     includeManifestIcons: false, // already matched by globPatterns below
@@ -89,12 +93,12 @@ const offline = () =>
       globPatterns: ['**/*.{html,js,css,woff,woff2,wasm,svg,png,webp}'], // public/ files included; the manifest is added by the plugin,
       // The launch video, its captions and the share image (public/launch/) are never cached
       // offline; precacheGuard() fails the build if sw.js lists any of them.
-      globIgnores: ['launch/**'],
+      globIgnores: ['launch/**', ...(search ? SEARCH_DIRS.map((d) => `${d}/**`) : [])],
       maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, // the HEIC decoder worker is ~2 MB
       navigateFallback: 'index.html',
       // The open-source notices (THIRD_PARTY_NOTICES.txt, linked from the privacy page) are a plain
       // file, not precached: opening it must reach the file, not get the app's page instead (D48).
-      navigateFallbackDenylist: [/\.txt$/],
+      navigateFallbackDenylist: [/\.txt$/, ...(search ? [SEARCH_ROUTES] : [])],
       cleanupOutdatedCaches: true,
       skipWaiting: true,
       clientsClaim: true,
@@ -111,7 +115,7 @@ export default defineConfig(({ mode }) => ({
   plugins: mode === 'artifact' ? [brandHead(), react()]
     : mode === ARTIFACT_TEST ? [brandHead(TEST_TITLE), react(), testBuild()]
     : mode === TEST_BUILD ? [brandHead(TEST_TITLE), react(), csp(), offline(), installTags(), testBuild(), deployFiles(), precacheGuard()]
-    : mode === LAUNCH ? [brandHead(), react(), csp(), offline(), installTags(), deployFiles({ launch: true }), precacheGuard()]
+    : mode === LAUNCH ? [brandHead(), react(), csp(), offline({ search: true }), installTags(), deployFiles({ launch: true }), searchPages(), precacheGuard()]
     : [brandHead(), react(), csp(), offline(), installTags(), deployFiles(), precacheGuard()],
   // Test builds never show the example-files button, whatever the environment says.
   define: mode === TEST_BUILD || mode === ARTIFACT_TEST ? { 'import.meta.env.VITE_SAMPLES': JSON.stringify('0') } : {},

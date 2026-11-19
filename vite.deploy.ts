@@ -128,8 +128,11 @@ export function headersFile(workers: { locked: string[]; wasm: string[] }, csp: 
 }
 
 export const ROBOTS_TXT = 'User-agent: *\nDisallow: /\n'
-/** robots.txt for the launch build (`npm run build:launch`): search engines may index the app. */
-export const ROBOTS_TXT_LAUNCH = 'User-agent: *\nAllow: /\n'
+/**
+ * robots.txt for the launch build (`npm run build:launch`): search engines may index the app, and
+ * are pointed at the sitemap that lists the search pages (D51, vite.search.ts).
+ */
+export const ROBOTS_TXT_LAUNCH = `User-agent: *\nAllow: /\nSitemap: ${SITE_URL}sitemap.xml\n`
 
 /** The launch build's message when the address isn't set (D42). */
 export const LAUNCH_NEEDS_SITE_URL = "launch build needs SITE_URL in src/brand.ts (D42): an https:// address ending in '/', e.g. 'https://example.org/'"

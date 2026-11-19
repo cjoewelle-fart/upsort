@@ -28,7 +28,7 @@ describe('launch headers', () => {
   });
   it('robots.txt allows indexing only in the launch build', () => {
     expect(ROBOTS_TXT).toBe('User-agent: *\nDisallow: /\n');
-    expect(ROBOTS_TXT_LAUNCH).toBe('User-agent: *\nAllow: /\n');
+    expect(ROBOTS_TXT_LAUNCH).toBe('User-agent: *\nAllow: /\nSitemap: https://upsort.app/sitemap.xml\n'); // D51: points at the sitemap
   });
 });
 
@@ -65,7 +65,10 @@ describe('build config', () => {
     expect(pkg.scripts['build:launch']).toBe('tsc -b && vite build --mode launch');
     expect(config).toContain("mode === LAUNCH ? { outDir: 'dist-launch' }");
     expect(config.match(/deployFiles\(\{ launch: true \}\)/g)?.length).toBe(1);
-    expect(config).toMatch(/mode === LAUNCH \? \[brandHead\(\), react\(\), csp\(\), offline\(\), installTags\(\), deployFiles\(\{ launch: true \}\), precacheGuard\(\)\]/);
+    expect(config).toMatch(/mode === LAUNCH \? \[brandHead\(\), react\(\), csp\(\), offline\(\{ search: true \}\), installTags\(\), deployFiles\(\{ launch: true \}\), searchPages\(\), precacheGuard\(\)\]/);
+    // D51: only the launch build writes the search pages and keeps them out of the cache.
+    expect(config.match(/searchPages\(\)/g)?.length).toBe(1);
+    expect(config.match(/offline\(\{ search: true \}\)/g)?.length).toBe(1);
     expect(readFileSync(join(__dirname, '..', '.gitignore'), 'utf8')).toMatch(/^dist-launch\/$/m);
   });
 });

@@ -65,6 +65,7 @@ describe('privacy page links', () => {
   it('the offline cache leaves the notices out and lets them open as a file', () => {
     const config = readFileSync(join(__dirname, '..', 'vite.config.ts'), 'utf8');
     expect(config).toMatch(/globPatterns: \['\*\*\/\*\.\{html,js,css,woff,woff2,wasm,svg,png,webp\}'\]/); // no .txt
-    expect(config).toContain('navigateFallbackDenylist: [/\\.txt$/]');
+    // The launch build also adds the search pages' addresses (D51); the notices rule is always first.
+    expect(config).toContain('navigateFallbackDenylist: [/\\.txt$/, ...(search ? [SEARCH_ROUTES] : [])]');
   });
 });
