@@ -1072,7 +1072,7 @@ const swap = (md: string, from: string, to: string) => {
 export const searchPages = {
   guide: {
     title: `PhotoRec guide: look for lost photos on a memory card · ${APP}`,
-    description: 'A step-by-step PhotoRec guide for Windows and Mac: look for lost photos on a memory card, then sort the recup_dir folders it makes by date.',
+    description: 'A step-by-step PhotoRec guide for Windows and Mac: look for lost photos on a memory card, then sort the photos in its recup_dir folders by date.',
     md: swap(
       swap(
         swap(GUIDE, '# Get your photos back from a memory card with PhotoRec', '# PhotoRec guide: look for lost photos on a memory card'),
@@ -1085,7 +1085,7 @@ export const searchPages = {
     /** The button at the end: opens the app's start screen (same label as copy.info.guide.cta). */
     cta: 'Sort my recovered files',
     /** The second link at the end: the other page. */
-    other: 'Sort PhotoRec files by date',
+    other: 'Read how to sort PhotoRec files by date',
   },
   sort: {
     title: `Sort PhotoRec files by date · ${APP}`,
