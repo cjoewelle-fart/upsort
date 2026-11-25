@@ -1,0 +1,10 @@
+{
+  "_comment": "Response headers for /sw.js on the hosted site, Nov 19 (T96/T128): Cloudflare's defaults, no _headers applied.",
+  "content-type": "text/javascript; charset=utf-8",
+  "x-content-type-options": "nosniff",
+  "access-control-allow-origin": "*",
+  "cache-control": "public, max-age=14400, must-revalidate",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "vary": "accept-encoding",
+  "server": "cloudflare"
+}

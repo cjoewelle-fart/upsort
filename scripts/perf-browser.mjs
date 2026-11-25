@@ -6,6 +6,8 @@
 //   node scripts/perf-browser.mjs <chromium> <dir>/recovery --handoff   # only the seconds after picking (T52)
 //   PERF_HEAPSNAP=<dir>: heap snapshots of the page and workers on the results screen (T57)
 //   PERF_GC=1: memory on the results screen again after a forced garbage collection; --results-only stops there
+//   BASE_URL=https://host/path/: test a hosted copy instead of `vite preview` of dist/ (T128). The local
+//   server is then neither started nor stopped, and --port only picks the DevTools port.
 //
 // Each run starts a fresh browser, feeds the folder through the app's folder-upload fallback
 // (as scripts/e2e.mjs does), and measures: scan time (to the results screen), time to the first
@@ -140,12 +142,21 @@ async function heapSnapshots(dt, outDir, n) {
   }
 }
 
-const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'pipe', detached: true });
-const stopServer = () => { try { process.kill(-server.pid); } catch { /* already stopped */ } };
+// BASE_URL (T128): a hosted copy. No local server is started, so there is nothing to stop: stopServer
+// only ever signals the process group of a server this script spawned, never a missing or dummy pid.
+const BASE_URL = process.env.BASE_URL ? new URL(process.env.BASE_URL.replace(/\/?$/, '/')).href : null;
+const server = BASE_URL ? null : spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'pipe', detached: true });
+const stopServer = () => {
+  const pid = server?.pid;
+  if (!Number.isInteger(pid) || pid <= 1) return; // not started (BASE_URL) or failed to start
+  try { process.kill(-pid); } catch { /* already stopped */ }
+};
 process.on('exit', stopServer);
 process.on('uncaughtException', (e) => { console.error(e); process.exit(1); });
-await new Promise((r) => server.stdout.on('data', (d) => String(d).includes(String(PORT)) && r()));
-const URL_ = `http://localhost:${PORT}/`;
+if (server) await new Promise((r) => server.stdout.on('data', (d) => String(d).includes(String(PORT)) && r()));
+const URL_ = BASE_URL ?? `http://localhost:${PORT}/`;
+const ORIGIN = new URL(URL_).origin;
+if (BASE_URL) console.log(`Testing the hosted copy at ${URL_} (no local server).`);
 
 async function run(n) {
   // A local launch (not launchServer + connect), so the folder is passed by path, not uploaded.
@@ -159,7 +170,7 @@ async function run(n) {
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   const failed = {};
   page.on('requestfailed', (r) => { const k = `${r.url().split(':')[0]} ${r.failure()?.errorText}`; failed[k] = (failed[k] ?? 0) + 1; });
-  page.on('request', (r) => { if (!/^(http:\/\/localhost:\d+|blob:|data:)/.test(r.url())) outside.push(r.url()); });
+  page.on('request', (r) => { const u = r.url(); if (!/^(blob:|data:)/.test(u) && !u.startsWith(`${ORIGIN}/`)) outside.push(u); });
   await page.addInitScript(() => {
     for (const k of ['showDirectoryPicker', 'showOpenFilePicker', 'showSaveFilePicker']) { delete window[k]; delete Window.prototype[k]; }
     window.__lt = [];

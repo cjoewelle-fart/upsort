@@ -18,6 +18,7 @@
     "e2e": "node scripts/e2e.mjs",
     "notices": "node scripts/make_notices.mjs",
     "offline-check": "node scripts/offline-check.mjs",
+    "live-check": "node scripts/live-check.mjs",
     "serve-dist": "node scripts/serve-dist.mjs",
     "a11y": "node scripts/a11y-check.mjs",
     "pilot-e2e": "node scripts/pilot-e2e.mjs",
